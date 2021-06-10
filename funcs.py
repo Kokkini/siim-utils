@@ -30,6 +30,7 @@ import numpy as np
 import pydicom
 from pydicom.pixel_data_handlers.util import apply_voi_lut
 import copy
+import torch
 
 from typing import Any, Dict, List
 
@@ -211,6 +212,24 @@ def format_pred(labels, boxes, scores) -> str:
             labelstr='opacity'
         pred_strings.append(f"{labelstr} {score:0.3f} {xmin} {ymin} {xmax} {ymax}") 
     return " ".join(pred_strings)
+
+def predict_batch(predictor, im_list):
+    with torch.no_grad():  # https://github.com/sphinx-doc/sphinx/issues/4258
+        inputs_list = []
+        for original_image in im_list:
+            # Apply pre-processing to image.
+            if predictor.input_format == "RGB":
+                # whether the model expects BGR inputs or RGB
+                original_image = original_image[:, :, ::-1]
+            height, width = original_image.shape[:2]
+            # Do not apply original augmentation, which is resize.
+            # image = predictor.aug.get_transform(original_image).apply_image(original_image)
+            image = original_image
+            image = torch.as_tensor(image.astype("float32").transpose(2, 0, 1))
+            inputs = {"image": image, "height": height, "width": width}
+            inputs_list.append(inputs)
+        predictions = predictor.model(inputs_list)
+        return predictions
 
 def format_detectron_output(output, portion):
     instances = output["instances"]
