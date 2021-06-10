@@ -132,7 +132,7 @@ def dataset_function(indir, anno_csv, auto_label=False, study_to_images=None, im
     dataset_dict = []
     id_to_bboxes = parse_anno_csv(anno_csv)
     if auto_label:
-        for id, bboxes in id_to_bboxes:
+        for id, bboxes in id_to_bboxes.items():
             if bboxes != []: continue
             study = image_to_study[id]
             study_images = study_to_images[study]
