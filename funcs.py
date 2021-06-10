@@ -130,7 +130,7 @@ def dataset_function(indir, anno_csv, auto_label=False, study_to_images=None, im
     # auto_label: set True if you want to automatically draw boxes on unlabeled
     # images in the same study
     dataset_dict = []
-    id_to_bboxes = parse_anno_csv(anno_csv, indir)
+    id_to_bboxes = parse_anno_csv(anno_csv)
     if auto_label:
         for id, bboxes in id_to_bboxes:
             if bboxes != []: continue
