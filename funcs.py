@@ -159,6 +159,10 @@ def dataset_function(indir, anno_csv, auto_label=False, study_to_images=None, im
         for box in item["annotations"]:
             if box["category_id"] == CLASS_TO_ID["negative"]:
                 box["bbox"] = [W*0.1, H*0.1, W*0.8, H*0.8]
+        # make sure bboxes is within H, W
+        for box in item["annotations"]:
+            x1, y1, x2, y2 = box["bbox"]
+            box["bbox"] = [max(x1, 0), max(y1, 0), min(x2, W-1), min(y2, H-1)]
         dataset_dict.append(item)
     return dataset_dict
 
