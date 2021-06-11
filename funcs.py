@@ -31,6 +31,7 @@ import pydicom
 from pydicom.pixel_data_handlers.util import apply_voi_lut
 import copy
 import torch
+import math
 
 from typing import Any, Dict, List
 
@@ -104,7 +105,7 @@ def parse_anno_csv(anno_csv):
                 if c == "negative":
                     bboxes.append({
                         "bbox": [0,0,1,1],
-                        "bbox_mode": BoxMode.XYWH_ABS,
+                        "bbox_mode": BoxMode.XYXY_ABS,
                         "category_id": category_id
                     })
         else:
@@ -119,8 +120,8 @@ def parse_anno_csv(anno_csv):
                 for b in boxes:
                     portion = 1/3
                     bboxes.append({
-                        "bbox": [b['x']*portion, b['y']*portion, b['width']*portion, b['height']*portion],
-                        "bbox_mode": BoxMode.XYWH_ABS,
+                        "bbox": [b['x']*portion, b['y']*portion, (b['x']+b['width'])*portion, (b['y']+b['height'])*portion],
+                        "bbox_mode": BoxMode.XYXY_ABS,
                         "category_id": category_id
                     })
         res[id] = bboxes
@@ -207,10 +208,10 @@ def format_pred(labels, boxes, scores) -> str:
     for label, score, bbox in zip(labels, scores, boxes):
         xmin, ymin, xmax, ymax = bbox.astype(np.int64)
         if label==CLASS_TO_ID["negative"]:
-            labelstr='none 1 0 0 1 1'
+            pred_strings.append('none 1 0 0 1 1') 
         else:
             labelstr='opacity'
-        pred_strings.append(f"{labelstr} {score:0.3f} {xmin} {ymin} {xmax} {ymax}") 
+            pred_strings.append(f"{labelstr} {score:0.3f} {xmin} {ymin} {xmax} {ymax}") 
     return " ".join(pred_strings)
 
 def predict_batch(predictor, im_list):
@@ -264,3 +265,16 @@ def format_detectron_output(output, portion):
         
         result["PredictionString"] = format_pred(pred_classes_array, pred_boxes_array, pred_scores_array)
     return result
+
+def full_dataset_detection(predictor, dataset_dict, batch_size, portion=1/3):
+    results_list = []
+    for i in tqdm(range(math.ceil(len(dataset_dict) / batch_size))):
+        inds = list(range(batch_size * i, min(batch_size * (i + 1), len(dataset_dict))))
+        dataset_dicts_batch = [dataset_dict[i] for i in inds]
+        im_list = [cv2.imread(d["file_name"]) for d in dataset_dicts_batch]
+        outputs_list = predict_batch(predictor, im_list)
+        for im, outputs, d in zip(im_list, outputs_list, dataset_dicts_batch):
+            result = format_detectron_output(outputs, portion)
+            result["image_id"] = d["image_id"]
+            results_list.append(result)
+    return results_list
